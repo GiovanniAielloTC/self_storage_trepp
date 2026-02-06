@@ -348,7 +348,10 @@ props = la_snap[['TREPPMASTERPROPERTYID', 'PROPERTY_NAME', 'ADDRESS', 'CITY', 'S
                  'ZIPCODE', 'VACANCY_RATE', 'OCCUPANCY_CURRENT', 'NOI_CURRENT',
                  'DSCR_CURRENT', 'LOAN_CURRENT_BALANCE', 'IS_WATCHLIST',
                  'IS_SPECIAL_SERVICING', 'IS_DELINQUENT', 'DISTRESS_SCORE',
-                 'YEAR_BUILT', 'UNITS']].copy()
+                 'YEAR_BUILT', 'UNITS', 'SQFT_CURRENT', 'SQFT_AT_SEC']].copy()
+
+# Use best available SQFT (prefer current, fallback to securitization)
+props['SQFT'] = props['SQFT_CURRENT'].fillna(props['SQFT_AT_SEC'])
 
 # Clean zip codes
 props['ZIPCODE'] = props['ZIPCODE'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
@@ -410,29 +413,40 @@ print("\nBuilding interactive map...")
 la_center = [34.05, -118.25]
 m = folium.Map(location=la_center, zoom_start=10, tiles='CartoDB positron')
 
-# Color by distress level
-def get_color(row):
-    if row['DISTRESS_SCORE'] >= 3:
-        return 'red'
-    elif row['DISTRESS_SCORE'] >= 1:
-        return 'orange'
-    elif row['VACANCY_RATE'] > 20:
-        return 'yellow'
-    elif row['VACANCY_RATE'] > 10:
-        return 'lightblue'
+# --- COLOR = Vacancy rate ---
+def get_vacancy_color(vac):
+    """Green (low vacancy) → Yellow → Orange → Red (high vacancy)"""
+    if vac <= 5:
+        return '#1a9641'   # dark green
+    elif vac <= 10:
+        return '#7bc96a'   # light green
+    elif vac <= 15:
+        return '#fee08b'   # yellow
+    elif vac <= 20:
+        return '#f46d43'   # orange
+    elif vac <= 30:
+        return '#d73027'   # red
     else:
-        return 'green'
+        return '#a50026'   # dark red
 
-def get_icon(row):
-    if row['DISTRESS_SCORE'] >= 3:
-        return 'exclamation-triangle'
-    elif row['DISTRESS_SCORE'] >= 1:
-        return 'warning'
-    else:
-        return 'home'
+# --- SIZE = SQFT (scaled) ---
+def get_radius(sqft):
+    """Scale SQFT to marker radius. Typical SS: 30K-150K sqft."""
+    if pd.isna(sqft) or sqft <= 0:
+        return 6  # default small
+    # sqrt scaling so big facilities don't dominate
+    return max(5, min(22, 3 + (sqft / 10000) ** 0.5 * 3))
+
+# --- SHAPE = triangle if distressed, circle if healthy ---
+def is_distressed(row):
+    return row.get('IS_WATCHLIST', 0) == 1 or \
+           row.get('IS_SPECIAL_SERVICING', 0) == 1 or \
+           row.get('IS_DELINQUENT', 0) == 1
 
 for _, row in geocoded.iterrows():
-    color = get_color(row)
+    color = get_vacancy_color(row['VACANCY_RATE'])
+    radius = get_radius(row.get('SQFT', None))
+    distressed = is_distressed(row)
 
     # Build popup HTML
     noi_str = f"${row['NOI_CURRENT']:,.0f}" if pd.notna(row['NOI_CURRENT']) else 'N/A'
@@ -440,12 +454,14 @@ for _, row in geocoded.iterrows():
     bal_str = f"${row['LOAN_CURRENT_BALANCE']:,.0f}" if pd.notna(row['LOAN_CURRENT_BALANCE']) else 'N/A'
     yr_str = f"{int(row['YEAR_BUILT'])}" if pd.notna(row['YEAR_BUILT']) else 'N/A'
     units_str = f"{int(row['UNITS'])}" if pd.notna(row['UNITS']) else 'N/A'
+    sqft_str = f"{row['SQFT']:,.0f}" if pd.notna(row.get('SQFT')) else 'N/A'
 
     distress_flags = []
     if row.get('IS_WATCHLIST', 0) == 1: distress_flags.append('Watchlist')
     if row.get('IS_SPECIAL_SERVICING', 0) == 1: distress_flags.append('Special Servicing')
     if row.get('IS_DELINQUENT', 0) == 1: distress_flags.append('Delinquent')
     distress_str = ', '.join(distress_flags) if distress_flags else 'None'
+    shape_label = '▲ DISTRESSED' if distressed else '● Healthy'
 
     popup_html = f"""
     <div style="font-family: Arial; width: 280px;">
@@ -453,40 +469,66 @@ for _, row in geocoded.iterrows():
         <p style="margin:2px 0; color:gray; font-size:11px;">{row['ADDRESS']}, {row['CITY']}, CA {row['ZIPCODE']}</p>
         <hr style="margin:5px 0;">
         <table style="font-size:12px; width:100%;">
-            <tr><td><b>Vacancy:</b></td><td>{row['VACANCY_RATE']:.1f}%</td></tr>
+            <tr><td><b>Vacancy:</b></td><td style="color:{color}; font-weight:bold;">{row['VACANCY_RATE']:.1f}%</td></tr>
+            <tr><td><b>SQFT:</b></td><td>{sqft_str}</td></tr>
             <tr><td><b>NOI:</b></td><td>{noi_str}</td></tr>
             <tr><td><b>DSCR:</b></td><td>{dscr_str}</td></tr>
             <tr><td><b>Loan Balance:</b></td><td>{bal_str}</td></tr>
             <tr><td><b>Year Built:</b></td><td>{yr_str}</td></tr>
             <tr><td><b>Units:</b></td><td>{units_str}</td></tr>
-            <tr><td><b>Distress:</b></td><td style="color:{'red' if distress_flags else 'green'};">{distress_str}</td></tr>
+            <tr><td><b>Status:</b></td><td style="color:{'red' if distressed else 'green'}; font-weight:bold;">{shape_label}</td></tr>
+            <tr><td><b>Flags:</b></td><td style="color:{'red' if distress_flags else 'green'};">{distress_str}</td></tr>
         </table>
     </div>
     """
 
-    folium.CircleMarker(
-        location=[row['lat'], row['lon']],
-        radius=max(5, min(15, row['VACANCY_RATE'] / 2)),  # Size by vacancy
-        color=color,
-        fill=True,
-        fill_color=color,
-        fill_opacity=0.7,
-        popup=folium.Popup(popup_html, max_width=320),
-        tooltip=f"{row['PROPERTY_NAME']} | Vac: {row['VACANCY_RATE']:.1f}%"
-    ).add_to(m)
+    if distressed:
+        # ▲ TRIANGLE marker for distressed properties
+        folium.RegularPolygonMarker(
+            location=[row['lat'], row['lon']],
+            number_of_sides=3,
+            radius=radius + 2,  # slightly bigger so triangles stand out
+            color='#333',
+            weight=2,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.85,
+            popup=folium.Popup(popup_html, max_width=320),
+            tooltip=f"▲ {row['PROPERTY_NAME']} | Vac: {row['VACANCY_RATE']:.1f}%"
+        ).add_to(m)
+    else:
+        # ● CIRCLE marker for healthy properties
+        folium.CircleMarker(
+            location=[row['lat'], row['lon']],
+            radius=radius,
+            color=color,
+            weight=1.5,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.7,
+            popup=folium.Popup(popup_html, max_width=320),
+            tooltip=f"{row['PROPERTY_NAME']} | Vac: {row['VACANCY_RATE']:.1f}%"
+        ).add_to(m)
 
 # Add legend
 legend_html = """
 <div style="position: fixed; bottom: 30px; left: 30px; z-index: 1000;
      background-color: white; padding: 15px; border-radius: 8px;
      box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-family: Arial; font-size: 12px;">
-    <h4 style="margin:0 0 8px 0;">LA Self-Storage CMBS</h4>
-    <p style="margin:3px 0;"><span style="color:green;">&#9679;</span> Healthy (Vac &lt; 10%, no distress)</p>
-    <p style="margin:3px 0;"><span style="color:lightblue;">&#9679;</span> Moderate Vacancy (10-20%)</p>
-    <p style="margin:3px 0;"><span style="color:yellow;">&#9679;</span> High Vacancy (&gt; 20%)</p>
-    <p style="margin:3px 0;"><span style="color:orange;">&#9679;</span> Distress Score 1-2</p>
-    <p style="margin:3px 0;"><span style="color:red;">&#9679;</span> Distress Score 3+ (severe)</p>
-    <p style="margin:6px 0 0 0; font-size:10px; color:gray;">Circle size = vacancy rate</p>
+    <h4 style="margin:0 0 10px 0;">LA Self-Storage CMBS</h4>
+    <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Color = Vacancy Rate</p>
+    <p style="margin:2px 0;"><span style="color:#1a9641;">&#9679;</span> Low (&le; 5%)</p>
+    <p style="margin:2px 0;"><span style="color:#7bc96a;">&#9679;</span> Normal (5-10%)</p>
+    <p style="margin:2px 0;"><span style="color:#fee08b;">&#9679;</span> Elevated (10-15%)</p>
+    <p style="margin:2px 0;"><span style="color:#f46d43;">&#9679;</span> High (15-20%)</p>
+    <p style="margin:2px 0;"><span style="color:#d73027;">&#9679;</span> Very High (20-30%)</p>
+    <p style="margin:2px 0;"><span style="color:#a50026;">&#9679;</span> Severe (&gt; 30%)</p>
+    <hr style="margin:8px 0;">
+    <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Shape = Distress Status</p>
+    <p style="margin:2px 0;">&#9679; Circle = Healthy</p>
+    <p style="margin:2px 0;">&#9650; Triangle = Distressed</p>
+    <hr style="margin:8px 0;">
+    <p style="margin:0; font-size:10px; color:gray;">Size = Square Footage</p>
 </div>
 """
 m.get_root().html.add_child(folium.Element(legend_html))
