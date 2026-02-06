@@ -332,211 +332,280 @@ plt.tight_layout()
 fig.savefig(FIGURES_DIR / 'la_ss_snapshot.png', dpi=150, bbox_inches='tight')
 print("Saved: la_ss_snapshot.png")
 
+
 # ====================================================================
-# 9. GEOCODE & MAP
+# 9. GEOCODE ALL UNIQUE LA PROPERTIES (across all years)
 # ====================================================================
 print(f"\n{'='*60}")
-print("GEOCODING LA PROPERTIES FOR MAP...")
+print("GEOCODING LA PROPERTIES FOR MAPS...")
 print("="*60)
 
 import folium
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
-# Get unique properties from latest snapshot
-props = la_snap[['TREPPMASTERPROPERTYID', 'PROPERTY_NAME', 'ADDRESS', 'CITY', 'STATE',
-                 'ZIPCODE', 'VACANCY_RATE', 'OCCUPANCY_CURRENT', 'NOI_CURRENT',
-                 'DSCR_CURRENT', 'LOAN_CURRENT_BALANCE', 'IS_WATCHLIST',
-                 'IS_SPECIAL_SERVICING', 'IS_DELINQUENT', 'DISTRESS_SCORE',
-                 'YEAR_BUILT', 'UNITS', 'SQFT_CURRENT', 'SQFT_AT_SEC']].copy()
+MAP_YEARS = [2016, 2019, 2022, 2025]
 
-# Use best available SQFT (prefer current, fallback to securitization)
-props['SQFT'] = props['SQFT_CURRENT'].fillna(props['SQFT_AT_SEC'])
+# Collect all unique properties across the target years
+all_props = []
+for yr in MAP_YEARS:
+    snap = la[la['REPORT_YEAR'] == yr].copy()
+    all_props.append(snap[['TREPPMASTERPROPERTYID', 'PROPERTY_NAME', 'ADDRESS',
+                           'CITY', 'STATE', 'ZIPCODE']].drop_duplicates('TREPPMASTERPROPERTYID'))
 
-# Clean zip codes
-props['ZIPCODE'] = props['ZIPCODE'].apply(lambda x: str(int(x)) if pd.notna(x) else '')
+all_unique = pd.concat(all_props).drop_duplicates('TREPPMASTERPROPERTYID')
+print(f"  Unique properties across {MAP_YEARS}: {len(all_unique)}")
 
-# Build geocoding string
-props['geocode_str'] = props['ADDRESS'] + ', ' + props['CITY'] + ', CA ' + props['ZIPCODE']
+# Load geocode cache if it exists
+geocode_cache_path = DATA_DIR / 'la_ss_geocode_cache.csv'
+if geocode_cache_path.exists():
+    cache = pd.read_csv(geocode_cache_path)
+    cache_dict = dict(zip(cache['TREPPMASTERPROPERTYID'],
+                          zip(cache['lat'], cache['lon'])))
+    print(f"  Loaded geocode cache: {len(cache_dict)} entries")
+else:
+    cache_dict = {}
+    print("  No geocode cache found — will geocode from scratch")
 
-# Geocode using Nominatim
-geolocator = Nominatim(user_agent="terracotta_ss_analysis", timeout=10)
-geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1.1)
+# Geocode missing properties
+to_geocode = all_unique[~all_unique['TREPPMASTERPROPERTYID'].isin(cache_dict)]
+print(f"  Properties to geocode: {len(to_geocode)}")
 
-coords = []
-total = len(props)
-success = 0
-for idx, row in props.iterrows():
-    try:
-        location = geocode(row['geocode_str'])
-        if location:
-            coords.append({
-                'TREPPMASTERPROPERTYID': row['TREPPMASTERPROPERTYID'],
-                'lat': location.latitude,
-                'lon': location.longitude
-            })
-            success += 1
-        else:
-            # Fallback: try just city + zip
-            fallback = f"{row['CITY']}, CA {row['ZIPCODE']}"
-            location = geocode(fallback)
+if len(to_geocode) > 0:
+    geolocator = Nominatim(user_agent="terracotta_ss_analysis", timeout=10)
+    geocode_fn = RateLimiter(geolocator.geocode, min_delay_seconds=1.1)
+
+    for idx, row in to_geocode.iterrows():
+        zip_str = str(int(row['ZIPCODE'])) if pd.notna(row['ZIPCODE']) else ''
+        geocode_str = f"{row['ADDRESS']}, {row['CITY']}, CA {zip_str}"
+        try:
+            location = geocode_fn(geocode_str)
+            if not location:
+                location = geocode_fn(f"{row['CITY']}, CA {zip_str}")
             if location:
-                coords.append({
-                    'TREPPMASTERPROPERTYID': row['TREPPMASTERPROPERTYID'],
-                    'lat': location.latitude,
-                    'lon': location.longitude
-                })
-                success += 1
-    except Exception as e:
-        pass
+                cache_dict[row['TREPPMASTERPROPERTYID']] = (location.latitude, location.longitude)
+        except Exception:
+            pass
+        done = len(cache_dict)
+        print(f"  Geocoded {done}/{len(all_unique)}...", end='\r')
 
-    if (len(coords) % 10 == 0) or (len(coords) == total):
-        print(f"  Geocoded {success}/{total}...", end='\r')
+    # Save updated cache
+    cache_rows = [{'TREPPMASTERPROPERTYID': pid, 'lat': ll[0], 'lon': ll[1]}
+                  for pid, ll in cache_dict.items()]
+    pd.DataFrame(cache_rows).to_csv(geocode_cache_path, index=False)
+    print(f"\n  Saved geocode cache: {len(cache_dict)} entries")
+else:
+    print("  All properties already cached")
 
-print(f"\n  Successfully geocoded: {success}/{total} properties")
-
-# Merge coordinates
-coord_df = pd.DataFrame(coords)
-props = props.merge(coord_df, on='TREPPMASTERPROPERTYID', how='left')
-geocoded = props.dropna(subset=['lat', 'lon'])
-
-# Save geocoded data
-geocoded.to_csv(DATA_DIR / 'la_ss_geocoded.csv', index=False)
-print(f"Saved geocoded data: {len(geocoded)} properties")
 
 # ====================================================================
-# 10. BUILD INTERACTIVE MAP
+# 10. BUILD INTERACTIVE MAPS — one per year
 # ====================================================================
-print("\nBuilding interactive map...")
 
-# Center on LA
-la_center = [34.05, -118.25]
-m = folium.Map(location=la_center, zoom_start=10, tiles='CartoDB positron')
-
-# --- COLOR = Vacancy rate ---
+# --- Helper functions ---
 def get_vacancy_color(vac):
-    """Green (low vacancy) → Yellow → Orange → Red (high vacancy)"""
-    if vac <= 5:
-        return '#1a9641'   # dark green
+    """Green (low vacancy) -> Yellow -> Orange -> Red (high vacancy)"""
+    if pd.isna(vac):
+        return '#999999'
+    elif vac <= 5:
+        return '#1a9641'
     elif vac <= 10:
-        return '#7bc96a'   # light green
+        return '#7bc96a'
     elif vac <= 15:
-        return '#fee08b'   # yellow
+        return '#fee08b'
     elif vac <= 20:
-        return '#f46d43'   # orange
+        return '#f46d43'
     elif vac <= 30:
-        return '#d73027'   # red
+        return '#d73027'
     else:
-        return '#a50026'   # dark red
+        return '#a50026'
 
-# --- SIZE = SQFT (scaled) ---
 def get_radius(sqft):
-    """Scale SQFT to marker radius. Typical SS: 30K-150K sqft."""
+    """Scale SQFT to marker radius."""
     if pd.isna(sqft) or sqft <= 0:
-        return 6  # default small
-    # sqrt scaling so big facilities don't dominate
+        return 6
     return max(5, min(22, 3 + (sqft / 10000) ** 0.5 * 3))
 
-# --- SHAPE = triangle if distressed, circle if healthy ---
 def is_distressed(row):
-    return row.get('IS_WATCHLIST', 0) == 1 or \
-           row.get('IS_SPECIAL_SERVICING', 0) == 1 or \
-           row.get('IS_DELINQUENT', 0) == 1
+    return (row.get('IS_WATCHLIST', 0) == 1 or
+            row.get('IS_SPECIAL_SERVICING', 0) == 1 or
+            row.get('IS_DELINQUENT', 0) == 1)
 
-for _, row in geocoded.iterrows():
-    color = get_vacancy_color(row['VACANCY_RATE'])
-    radius = get_radius(row.get('SQFT', None))
-    distressed = is_distressed(row)
 
-    # Build popup HTML
-    noi_str = f"${row['NOI_CURRENT']:,.0f}" if pd.notna(row['NOI_CURRENT']) else 'N/A'
-    dscr_str = f"{row['DSCR_CURRENT']:.2f}x" if pd.notna(row['DSCR_CURRENT']) else 'N/A'
-    bal_str = f"${row['LOAN_CURRENT_BALANCE']:,.0f}" if pd.notna(row['LOAN_CURRENT_BALANCE']) else 'N/A'
-    yr_str = f"{int(row['YEAR_BUILT'])}" if pd.notna(row['YEAR_BUILT']) else 'N/A'
-    units_str = f"{int(row['UNITS'])}" if pd.notna(row['UNITS']) else 'N/A'
-    sqft_str = f"{row['SQFT']:,.0f}" if pd.notna(row.get('SQFT')) else 'N/A'
+def build_map(year_df, year, cache_dict):
+    """Build a folium map for one year's snapshot."""
+    props = year_df[['TREPPMASTERPROPERTYID', 'PROPERTY_NAME', 'ADDRESS', 'CITY', 'STATE',
+                      'ZIPCODE', 'VACANCY_RATE', 'OCCUPANCY_CURRENT', 'NOI_CURRENT',
+                      'DSCR_CURRENT', 'LOAN_CURRENT_BALANCE', 'IS_WATCHLIST',
+                      'IS_SPECIAL_SERVICING', 'IS_DELINQUENT', 'DISTRESS_SCORE',
+                      'YEAR_BUILT', 'UNITS', 'SQFT_CURRENT', 'SQFT_AT_SEC']].copy()
+    props['SQFT'] = props['SQFT_CURRENT'].fillna(props['SQFT_AT_SEC'])
 
-    distress_flags = []
-    if row.get('IS_WATCHLIST', 0) == 1: distress_flags.append('Watchlist')
-    if row.get('IS_SPECIAL_SERVICING', 0) == 1: distress_flags.append('Special Servicing')
-    if row.get('IS_DELINQUENT', 0) == 1: distress_flags.append('Delinquent')
-    distress_str = ', '.join(distress_flags) if distress_flags else 'None'
-    shape_label = '▲ DISTRESSED' if distressed else '● Healthy'
+    # Attach cached coordinates
+    props['lat'] = props['TREPPMASTERPROPERTYID'].map(lambda pid: cache_dict.get(pid, (None, None))[0])
+    props['lon'] = props['TREPPMASTERPROPERTYID'].map(lambda pid: cache_dict.get(pid, (None, None))[1])
+    geocoded = props.dropna(subset=['lat', 'lon'])
 
-    popup_html = f"""
-    <div style="font-family: Arial; width: 280px;">
-        <h4 style="margin-bottom:5px;">{row['PROPERTY_NAME']}</h4>
-        <p style="margin:2px 0; color:gray; font-size:11px;">{row['ADDRESS']}, {row['CITY']}, CA {row['ZIPCODE']}</p>
-        <hr style="margin:5px 0;">
-        <table style="font-size:12px; width:100%;">
-            <tr><td><b>Vacancy:</b></td><td style="color:{color}; font-weight:bold;">{row['VACANCY_RATE']:.1f}%</td></tr>
-            <tr><td><b>SQFT:</b></td><td>{sqft_str}</td></tr>
-            <tr><td><b>NOI:</b></td><td>{noi_str}</td></tr>
-            <tr><td><b>DSCR:</b></td><td>{dscr_str}</td></tr>
-            <tr><td><b>Loan Balance:</b></td><td>{bal_str}</td></tr>
-            <tr><td><b>Year Built:</b></td><td>{yr_str}</td></tr>
-            <tr><td><b>Units:</b></td><td>{units_str}</td></tr>
-            <tr><td><b>Status:</b></td><td style="color:{'red' if distressed else 'green'}; font-weight:bold;">{shape_label}</td></tr>
-            <tr><td><b>Flags:</b></td><td style="color:{'red' if distress_flags else 'green'};">{distress_str}</td></tr>
-        </table>
+    # Save the 2025 geocoded set for other scripts
+    if year == 2025:
+        geocoded.to_csv(DATA_DIR / 'la_ss_geocoded.csv', index=False)
+
+    # Summary stats for title
+    n = len(geocoded)
+    avg_vac = geocoded['VACANCY_RATE'].mean()
+    n_distressed = geocoded.apply(is_distressed, axis=1).sum()
+
+    la_center = [34.05, -118.25]
+    m = folium.Map(location=la_center, zoom_start=10, tiles='CartoDB positron')
+
+    # Add property markers
+    for _, row in geocoded.iterrows():
+        color = get_vacancy_color(row['VACANCY_RATE'])
+        radius = get_radius(row.get('SQFT', None))
+        distressed = is_distressed(row)
+
+        noi_str = f"${row['NOI_CURRENT']:,.0f}" if pd.notna(row['NOI_CURRENT']) else 'N/A'
+        dscr_str = f"{row['DSCR_CURRENT']:.2f}x" if pd.notna(row['DSCR_CURRENT']) else 'N/A'
+        bal_str = f"${row['LOAN_CURRENT_BALANCE']:,.0f}" if pd.notna(row['LOAN_CURRENT_BALANCE']) else 'N/A'
+        yr_str = f"{int(row['YEAR_BUILT'])}" if pd.notna(row['YEAR_BUILT']) else 'N/A'
+        units_str = f"{int(row['UNITS'])}" if pd.notna(row['UNITS']) else 'N/A'
+        sqft_str = f"{row['SQFT']:,.0f}" if pd.notna(row.get('SQFT')) else 'N/A'
+        vac_str = f"{row['VACANCY_RATE']:.1f}%" if pd.notna(row['VACANCY_RATE']) else 'N/A'
+
+        distress_flags = []
+        if row.get('IS_WATCHLIST', 0) == 1: distress_flags.append('Watchlist')
+        if row.get('IS_SPECIAL_SERVICING', 0) == 1: distress_flags.append('Special Servicing')
+        if row.get('IS_DELINQUENT', 0) == 1: distress_flags.append('Delinquent')
+        distress_str = ', '.join(distress_flags) if distress_flags else 'None'
+        shape_label = '&#9650; DISTRESSED' if distressed else '&#9679; Healthy'
+
+        popup_html = f"""
+        <div style="font-family: Arial; width: 280px;">
+            <h4 style="margin-bottom:5px;">{row['PROPERTY_NAME']}</h4>
+            <p style="margin:2px 0; color:gray; font-size:11px;">{row['ADDRESS']}, {row['CITY']}, CA {row['ZIPCODE']}</p>
+            <hr style="margin:5px 0;">
+            <table style="font-size:12px; width:100%;">
+                <tr><td><b>Year:</b></td><td>{year}</td></tr>
+                <tr><td><b>Vacancy:</b></td><td style="color:{color}; font-weight:bold;">{vac_str}</td></tr>
+                <tr><td><b>SQFT:</b></td><td>{sqft_str}</td></tr>
+                <tr><td><b>NOI:</b></td><td>{noi_str}</td></tr>
+                <tr><td><b>DSCR:</b></td><td>{dscr_str}</td></tr>
+                <tr><td><b>Loan Balance:</b></td><td>{bal_str}</td></tr>
+                <tr><td><b>Year Built:</b></td><td>{yr_str}</td></tr>
+                <tr><td><b>Units:</b></td><td>{units_str}</td></tr>
+                <tr><td><b>Status:</b></td><td style="color:{'red' if distressed else 'green'}; font-weight:bold;">{shape_label}</td></tr>
+                <tr><td><b>Flags:</b></td><td style="color:{'red' if distress_flags else 'green'};">{distress_str}</td></tr>
+            </table>
+        </div>
+        """
+
+        if distressed:
+            folium.RegularPolygonMarker(
+                location=[row['lat'], row['lon']],
+                number_of_sides=3,
+                radius=radius + 2,
+                color='#333', weight=2, fill=True,
+                fill_color=color, fill_opacity=0.85,
+                popup=folium.Popup(popup_html, max_width=320),
+                tooltip=f"▲ {row['PROPERTY_NAME']} | Vac: {vac_str}"
+            ).add_to(m)
+        else:
+            folium.CircleMarker(
+                location=[row['lat'], row['lon']],
+                radius=radius,
+                color=color, weight=1.5, fill=True,
+                fill_color=color, fill_opacity=0.7,
+                popup=folium.Popup(popup_html, max_width=320),
+                tooltip=f"{row['PROPERTY_NAME']} | Vac: {vac_str}"
+            ).add_to(m)
+
+    # Legend
+    legend_html = f"""
+    <div style="position: fixed; bottom: 30px; left: 30px; z-index: 1000;
+         background-color: white; padding: 15px; border-radius: 8px;
+         box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-family: Arial; font-size: 12px;">
+        <h4 style="margin:0 0 5px 0;">LA Self-Storage CMBS &mdash; {year}</h4>
+        <p style="margin:0 0 3px 0; font-size:11px; color:#555;">{n} properties | Avg vacancy {avg_vac:.1f}% | {n_distressed} distressed</p>
+        <hr style="margin:6px 0;">
+        <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Color = Vacancy Rate</p>
+        <p style="margin:2px 0;"><span style="color:#1a9641;">&#9679;</span> Low (&le; 5%)</p>
+        <p style="margin:2px 0;"><span style="color:#7bc96a;">&#9679;</span> Normal (5-10%)</p>
+        <p style="margin:2px 0;"><span style="color:#fee08b;">&#9679;</span> Elevated (10-15%)</p>
+        <p style="margin:2px 0;"><span style="color:#f46d43;">&#9679;</span> High (15-20%)</p>
+        <p style="margin:2px 0;"><span style="color:#d73027;">&#9679;</span> Very High (20-30%)</p>
+        <p style="margin:2px 0;"><span style="color:#a50026;">&#9679;</span> Severe (&gt; 30%)</p>
+        <hr style="margin:8px 0;">
+        <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Shape = Distress Status</p>
+        <p style="margin:2px 0;">&#9679; Circle = Healthy</p>
+        <p style="margin:2px 0;">&#9650; Triangle = Distressed</p>
+        <p style="margin:2px 0; color:#DAA520; font-weight:bold;">&#9733; Star = Proposed Site</p>
+        <hr style="margin:8px 0;">
+        <p style="margin:0; font-size:10px; color:gray;">Size = Square Footage</p>
     </div>
     """
+    m.get_root().html.add_child(folium.Element(legend_html))
 
-    if distressed:
-        # ▲ TRIANGLE marker for distressed properties
-        folium.RegularPolygonMarker(
-            location=[row['lat'], row['lon']],
-            number_of_sides=3,
-            radius=radius + 2,  # slightly bigger so triangles stand out
-            color='#333',
-            weight=2,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.85,
-            popup=folium.Popup(popup_html, max_width=320),
-            tooltip=f"▲ {row['PROPERTY_NAME']} | Vac: {row['VACANCY_RATE']:.1f}%"
-        ).add_to(m)
-    else:
-        # ● CIRCLE marker for healthy properties
-        folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=radius,
-            color=color,
-            weight=1.5,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.7,
-            popup=folium.Popup(popup_html, max_width=320),
-            tooltip=f"{row['PROPERTY_NAME']} | Vac: {row['VACANCY_RATE']:.1f}%"
-        ).add_to(m)
+    # Star marker + radius rings on all maps
+    proposed_popup = f"""
+    <div style="font-family: Arial; width: 280px;">
+        <h4 style="margin-bottom:5px; color:#DAA520;">&#9733; PROPOSED SITE</h4>
+        <p style="margin:2px 0; font-size:13px; font-weight:bold;">222 E 7th St</p>
+        <p style="margin:2px 0; color:gray; font-size:11px;">Downtown Los Angeles, CA 90014</p>
+        <hr style="margin:5px 0;">
+        <p style="margin:4px 0; font-size:12px;">TerraCotta Group — New self-storage development under evaluation.</p>
+        <p style="margin:4px 0; font-size:11px; color:#555;">Map vintage: {year} | Click nearby markers to see CMBS competitors.</p>
+    </div>
+    """
+    folium.Marker(
+        location=[34.0438, -118.2500],
+        popup=folium.Popup(proposed_popup, max_width=320),
+        tooltip=f"&#9733; PROPOSED SITE: 222 E 7th St ({year})",
+        icon=folium.Icon(color='cadetblue', icon='star', prefix='fa')
+    ).add_to(m)
 
-# Add legend
-legend_html = """
-<div style="position: fixed; bottom: 30px; left: 30px; z-index: 1000;
-     background-color: white; padding: 15px; border-radius: 8px;
-     box-shadow: 2px 2px 6px rgba(0,0,0,0.3); font-family: Arial; font-size: 12px;">
-    <h4 style="margin:0 0 10px 0;">LA Self-Storage CMBS</h4>
-    <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Color = Vacancy Rate</p>
-    <p style="margin:2px 0;"><span style="color:#1a9641;">&#9679;</span> Low (&le; 5%)</p>
-    <p style="margin:2px 0;"><span style="color:#7bc96a;">&#9679;</span> Normal (5-10%)</p>
-    <p style="margin:2px 0;"><span style="color:#fee08b;">&#9679;</span> Elevated (10-15%)</p>
-    <p style="margin:2px 0;"><span style="color:#f46d43;">&#9679;</span> High (15-20%)</p>
-    <p style="margin:2px 0;"><span style="color:#d73027;">&#9679;</span> Very High (20-30%)</p>
-    <p style="margin:2px 0;"><span style="color:#a50026;">&#9679;</span> Severe (&gt; 30%)</p>
-    <hr style="margin:8px 0;">
-    <p style="margin:0 0 6px 0; font-weight:bold; font-size:11px;">Shape = Distress Status</p>
-    <p style="margin:2px 0;">&#9679; Circle = Healthy</p>
-    <p style="margin:2px 0;">&#9650; Triangle = Distressed</p>
-    <hr style="margin:8px 0;">
-    <p style="margin:0; font-size:10px; color:gray;">Size = Square Footage</p>
-</div>
-"""
-m.get_root().html.add_child(folium.Element(legend_html))
+    METERS_PER_MILE = 1609.34
+    folium.Circle(
+        location=[34.0438, -118.2500],
+        radius=3 * METERS_PER_MILE,
+        color='#DAA520', weight=2, fill=False,
+        dash_array='8 6',
+        tooltip='3-mile primary trade area',
+    ).add_to(m)
+    folium.Circle(
+        location=[34.0438, -118.2500],
+        radius=5 * METERS_PER_MILE,
+        color='#DAA520', weight=1.5, fill=False,
+        dash_array='4 8',
+        tooltip='5-mile secondary trade area',
+    ).add_to(m)
 
-# Save map
-map_path = OUTPUT_DIR / 'la_self_storage_map.html'
-m.save(str(map_path))
-print(f"Saved interactive map: {map_path}")
+    return m, n
+
+
+# --- Generate maps for each year ---
+print("\nBuilding interactive maps...")
+for yr in MAP_YEARS:
+    snap = la[la['REPORT_YEAR'] == yr].copy()
+    for c in num_cols:
+        if c in snap.columns:
+            snap[c] = pd.to_numeric(snap[c], errors='coerce')
+    snap['DISTRESS_SCORE'] = (
+        snap.get('IS_WATCHLIST', 0).fillna(0).astype(int) +
+        snap.get('IS_SPECIAL_SERVICING', 0).fillna(0).astype(int) +
+        snap.get('IS_DELINQUENT', 0).fillna(0).astype(int)
+    )
+
+    m, n = build_map(snap, yr, cache_dict)
+    fname = f'la_self_storage_map_{yr}.html'
+    m.save(str(OUTPUT_DIR / fname))
+    print(f"  {yr}: {n} properties -> {fname}")
+
+# Also save the latest as the default map name
+import shutil
+shutil.copy(OUTPUT_DIR / 'la_self_storage_map_2025.html',
+            OUTPUT_DIR / 'la_self_storage_map.html')
+print(f"  Copied 2025 map -> la_self_storage_map.html")
+
 
 # ====================================================================
 # 11. COMPARISON: LA vs NATIONAL
