@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Center of Valencia — Property Profile</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; color: #333; }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white; padding: 30px 20px; text-align: center;
+        }
+        .header h1 { font-size: 1.8em; margin-bottom: 4px; }
+        .header .address { color: #aaa; font-size: 0.95em; }
+        .header .category {
+            display: inline-block; margin-top: 10px; padding: 4px 14px;
+            border-radius: 20px; font-size: 0.85em; font-weight: 600;
+            background: #27ae60; color: white;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        .kpi-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin-bottom: 24px;
+        }
+        .kpi {
+            background: white; border-radius: 10px; padding: 16px; text-align: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .kpi .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .value { font-size: 1.5em; font-weight: 700; margin-top: 4px; }
+        .kpi .sub { font-size: 0.75em; color: #999; margin-top: 2px; }
+        .chart-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 16px; margin-bottom: 20px;
+        }
+        .chart-card {
+            background: white; border-radius: 10px; padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .chart-card h3 {
+            font-size: 0.95em; color: #555; margin-bottom: 12px;
+            border-bottom: 2px solid #eee; padding-bottom: 6px;
+        }
+        canvas { max-height: 280px; }
+        .data-table {
+            background: white; border-radius: 10px; padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .data-table h3 { font-size: 0.95em; color: #555; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        th { background: #f1f3f5; padding: 8px 10px; text-align: right; font-weight: 600; color: #555; }
+        th:first-child { text-align: left; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; text-align: right; }
+        td:first-child { text-align: left; font-weight: 600; }
+        .footer {
+            text-align: center; padding: 20px; color: #aaa; font-size: 0.8em;
+            border-top: 1px solid #eee; margin-top: 20px;
+        }
+        .footer a { color: #888; text-decoration: none; }
+        .nav { text-align: center; margin-bottom: 16px; }
+        .nav a {
+            display: inline-block; padding: 6px 16px; margin: 4px;
+            border-radius: 20px; background: #e9ecef; color: #495057;
+            text-decoration: none; font-size: 0.85em;
+        }
+        .nav a:hover { background: #dee2e6; }
+        @media (max-width: 700px) {
+            .chart-grid { grid-template-columns: 1fr; }
+            .kpi-row { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📉 Storage Center of Valencia</h1>
+        <div class="address">26407 Bouquet Canyon Road, Santa Clarita, CA 91350.0 &nbsp;|&nbsp; Built: 2004</div>
+        <div class="category">High → Low Vacancy</div>
+    </div>
+    <div class="container">
+        <div class="nav">
+            <a href="index.html">← All Maps</a>
+            <a href="property_profiles.html">All 8 Profiles</a>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi">
+                <div class="label">Latest Vacancy</div>
+                <div class="value" style="color: #27ae60;">7.7%</div>
+                <div class="sub">2022</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Latest NOI</div>
+                <div class="value">N/A</div>
+                <div class="sub">2022</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Latest DSCR</div>
+                <div class="value" style="color: #27ae60;">N/A</div>
+                <div class="sub">2022</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Loan Balance</div>
+                <div class="value">$0</div>
+                <div class="sub">2022</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Data Span</div>
+                <div class="value" style="font-size:1.1em;">2007–2022</div>
+                <div class="sub">16 years</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Watchlist</div>
+                <div class="value" style="color: #27ae60;">✅ No</div>
+                <div class="sub">2022</div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>📊 Vacancy Rate (%)</h3>
+                <canvas id="chartVacancy"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>💰 NOI & Revenue ($)</h3>
+                <canvas id="chartNOI"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🏗️ OPEX & OPEX Ratio</h3>
+                <canvas id="chartOPEX"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>🏦 Loan Balance ($)</h3>
+                <canvas id="chartLoan"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>📈 DSCR (Debt Service Coverage)</h3>
+                <canvas id="chartDSCR"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>📊 NOI Margin (%)</h3>
+                <canvas id="chartMargin"></canvas>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <h3>📋 Full Data Table</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Year</th><th>Vacancy</th><th>NOI</th><th>Revenue</th>
+                        <th>OPEX</th><th>OPEX Ratio</th><th>NOI Margin</th>
+                        <th>DSCR</th><th>Loan Bal.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>2007</td><td>31.1%</td><td>$197,610</td><td>$436,104</td><td>$238,494</td><td>54.7%</td><td>45.3%</td><td>1.12x</td><td>$4,670,627</td></tr>
+                    <tr><td>2008</td><td>30.1%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,617,354</td></tr>
+                    <tr><td>2009</td><td>31.0%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,559,730</td></tr>
+                    <tr><td>2010</td><td>29.2%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,498,309</td></tr>
+                    <tr><td>2011</td><td>29.3%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,432,842</td></tr>
+                    <tr><td>2012</td><td>29.3%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,363,858</td></tr>
+                    <tr><td>2013</td><td>23.0%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$4,295,469</td></tr>
+                    <tr><td>2014</td><td>22.9%</td><td>$471,798</td><td>$980,318</td><td>$508,520</td><td>51.9%</td><td>48.1%</td><td>1.34x</td><td>$4,210,309</td></tr>
+                    <tr><td>2015</td><td>9.9%</td><td>$490,771</td><td>$999,551</td><td>$508,781</td><td>50.9%</td><td>49.1%</td><td>1.40x</td><td>$4,125,866</td></tr>
+                    <tr><td>2016</td><td>7.7%</td><td>$541,789</td><td>$1,063,847</td><td>$522,058</td><td>49.1%</td><td>50.9%</td><td>1.54x</td><td>$0</td></tr>
+                    <tr><td>2017</td><td>7.7%</td><td>$541,789</td><td>$1,063,847</td><td>$522,058</td><td>49.1%</td><td>50.9%</td><td>1.54x</td><td>$0</td></tr>
+                    <tr><td>2018</td><td>7.7%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$0</td></tr>
+                    <tr><td>2019</td><td>7.7%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$0</td></tr>
+                    <tr><td>2020</td><td>7.7%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$0</td></tr>
+                    <tr><td>2021</td><td>7.7%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$0</td></tr>
+                    <tr><td>2022</td><td>7.7%</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>$0</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>TerraCotta Group — CRE Research | Data: Trepp CMBS via Snowflake</p>
+        <p><a href="index.html">← Back to Maps</a> &nbsp;|&nbsp; <a href="property_profiles.html">All Profiles</a></p>
+    </div>
+
+    <script>
+    const years = [2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022];
+    const vacancy = [31.12, 30.05, 30.99, 29.16, 29.34, 29.34, 22.99, 22.86, 9.92, 7.66, 7.66, 7.66, 7.66, 7.66, 7.66, 7.66];
+    const noi = [197610.33, null, null, null, null, null, null, 471798.36, 490770.67, 541789.15, 541789.15, null, null, null, null, null];
+    const revenue = [436104.44, null, null, null, null, null, null, 980318.36, 999551.29, 1063846.77, 1063846.77, null, null, null, null, null];
+    const opex = [238494.11, null, null, null, null, null, null, 508520.0, 508780.62, 522057.62, 522057.62, null, null, null, null, null];
+    const opexRatio = [54.7, null, null, null, null, null, null, 51.9, 50.9, 49.1, 49.1, null, null, null, null, null];
+    const noiMargin = [45.3, null, null, null, null, null, null, 48.1, 49.1, 50.9, 50.9, null, null, null, null, null];
+    const dscr = [1.12, null, null, null, null, null, null, 1.34, 1.4, 1.54, 1.54, null, null, null, null, null];
+    const loan = [4670627.23, 4617354.46, 4559730.23, 4498309.36, 4432841.73, 4363858.05, 4295469.34, 4210308.86, 4125866.07, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+
+    const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11 } } } },
+        scales: { x: { ticks: { font: { size: 11 } } }, y: { ticks: { font: { size: 11 } } } },
+        spanGaps: true,
+    };
+
+    // Vacancy
+    new Chart(document.getElementById('chartVacancy'), {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Vacancy %',
+                data: vacancy,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231,76,60,0.1)',
+                fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, ticks: { callback: v => v+'%' } } } }
+    });
+
+    // NOI & Revenue
+    new Chart(document.getElementById('chartNOI'), {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [
+                { label: 'Revenue', data: revenue, backgroundColor: 'rgba(52,152,219,0.6)', borderRadius: 3 },
+                { label: 'NOI', data: noi, backgroundColor: 'rgba(46,204,113,0.7)', borderRadius: 3 },
+            ]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ticks: { callback: v => '$'+Math.round(v/1000)+'K' } } } }
+    });
+
+    // OPEX + OPEX Ratio
+    new Chart(document.getElementById('chartOPEX'), {
+        type: 'bar',
+        data: {
+            labels: years,
+            datasets: [
+                { label: 'OPEX ($)', data: opex, backgroundColor: 'rgba(230,126,34,0.6)', borderRadius: 3, yAxisID: 'y' },
+                { label: 'OPEX Ratio (%)', data: opexRatio, type: 'line', borderColor: '#8e44ad', pointRadius: 4, borderWidth: 2, yAxisID: 'y1' },
+            ]
+        },
+        options: {
+            ...commonOpts,
+            scales: {
+                x: commonOpts.scales.x,
+                y: { position: 'left', ticks: { callback: v => '$'+Math.round(v/1000)+'K' } },
+                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v+'%' }, min: 0, max: 100 },
+            }
+        }
+    });
+
+    // Loan Balance
+    new Chart(document.getElementById('chartLoan'), {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Loan Balance',
+                data: loan,
+                borderColor: '#2c3e50',
+                backgroundColor: 'rgba(44,62,80,0.08)',
+                fill: true, tension: 0.2, pointRadius: 4, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ticks: { callback: v => '$'+(v/1e6).toFixed(1)+'M' } } } }
+    });
+
+    // DSCR
+    new Chart(document.getElementById('chartDSCR'), {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [
+                { label: 'DSCR', data: dscr, borderColor: '#2980b9', pointRadius: 4, borderWidth: 2, tension: 0.3 },
+                { label: '1.0x Threshold', data: years.map(() => 1.0), borderColor: '#e74c3c', borderDash: [6,4], borderWidth: 1.5, pointRadius: 0 },
+                { label: '1.25x Threshold', data: years.map(() => 1.25), borderColor: '#f39c12', borderDash: [6,4], borderWidth: 1.5, pointRadius: 0 },
+            ]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, ticks: { callback: v => v.toFixed(1)+'x' } } } }
+    });
+
+    // NOI Margin
+    new Chart(document.getElementById('chartMargin'), {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'NOI Margin %',
+                data: noiMargin,
+                borderColor: '#27ae60',
+                backgroundColor: 'rgba(39,174,96,0.1)',
+                fill: true, tension: 0.3, pointRadius: 4, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, max: 100, ticks: { callback: v => v+'%' } } } }
+    });
+    </script>
+</body>
+</html>
