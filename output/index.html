@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LA Self-Storage CMBS — Interactive Maps & Property Profiles</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f5f5; color: #333; }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white; padding: 40px 20px; text-align: center;
+        }
+        .header h1 { font-size: 2em; margin-bottom: 8px; }
+        .header p { font-size: 1.1em; color: #aaa; }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 0.95em; }
+        .section-title {
+            font-size: 1.4em; font-weight: 700; color: #1a1a2e;
+            margin: 40px 0 16px; padding-bottom: 8px;
+            border-bottom: 2px solid #e0e0e0; text-align: center;
+        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: white; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none; color: inherit; display: block;
+        }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        .card-body { padding: 24px; }
+        .card-year { font-size: 2.2em; font-weight: 700; color: #1a1a2e; }
+        .card-stats { margin-top: 12px; font-size: 0.9em; color: #555; line-height: 1.8; }
+        .card-stats span { font-weight: 600; }
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.75em; font-weight: 600; margin-left: 8px; vertical-align: middle;
+        }
+        .badge-green { background: #d4edda; color: #155724; }
+        .badge-yellow { background: #fff3cd; color: #856404; }
+        .badge-red { background: #f8d7da; color: #721c24; }
+        .badge-blue { background: #cce5ff; color: #004085; }
+        /* Profile cards */
+        .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .profile-card {
+            background: white; border-radius: 10px; overflow: hidden;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.1); transition: transform 0.2s;
+            text-decoration: none; color: inherit; display: block;
+        }
+        .profile-card:hover { transform: translateY(-3px); box-shadow: 0 4px 14px rgba(0,0,0,0.15); }
+        .profile-card .card-body { padding: 18px; }
+        .profile-badge {
+            display: inline-block; padding: 3px 10px; border-radius: 16px;
+            font-size: 0.72em; font-weight: 600; color: white; margin-bottom: 6px;
+        }
+        .profile-name { font-size: 1.05em; font-weight: 600; }
+        .cta-text { font-size: 0.8em; color: #888; margin-top: 6px; }
+        .footer {
+            text-align: center; padding: 30px 20px; color: #999; font-size: 0.85em;
+            margin-top: 40px; border-top: 1px solid #e0e0e0;
+        }
+        .footer a { color: #666; }
+        @media (max-width: 600px) { .grid, .profile-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>LA Self-Storage CMBS</h1>
+        <p>Interactive Maps, Property Profiles & Vacancy Trajectories</p>
+    </div>
+    <div class="container">
+
+        <!-- ── Maps Section ──────────────────────────── -->
+        <div class="section-title">🗺️ Interactive Maps — Supply Through the Cycle</div>
+        <p class="subtitle">
+            Click any map to explore. Each marker encodes vacancy (color), square footage (size),
+            and distress status (shape). ★ marks the proposed 222 E 7th St development site.
+        </p>
+        <div class="grid">
+            <a class="card" href="la_self_storage_map_2016.html">
+                <div class="card-body">
+                    <div class="card-year">2016 <span class="badge badge-blue">Peak Supply</span></div>
+                    <div class="card-stats">
+                        <span>188</span> properties<br>
+                        <span>8.8%</span> avg vacancy<br>
+                        <span>6.9%</span> watchlist rate
+                    </div>
+                    <div class="cta-text">Post-recovery tightening — vacancy falling fast →</div>
+                </div>
+            </a>
+            <a class="card" href="la_self_storage_map_2019.html">
+                <div class="card-body">
+                    <div class="card-year">2019 <span class="badge badge-green">Pre-COVID</span></div>
+                    <div class="card-stats">
+                        <span>175</span> properties<br>
+                        <span>10.1%</span> avg vacancy<br>
+                        <span>5.7%</span> watchlist rate
+                    </div>
+                    <div class="cta-text">Cycle equilibrium — healthy fundamentals →</div>
+                </div>
+            </a>
+            <a class="card" href="la_self_storage_map_2022.html">
+                <div class="card-body">
+                    <div class="card-year">2022 <span class="badge badge-green">COVID Boom</span></div>
+                    <div class="card-stats">
+                        <span>151</span> properties<br>
+                        <span>5.9%</span> avg vacancy<br>
+                        <span>9.3%</span> watchlist rate
+                    </div>
+                    <div class="cta-text">Historic low vacancy — pandemic demand surge →</div>
+                </div>
+            </a>
+            <a class="card" href="la_self_storage_map_2025.html">
+                <div class="card-body">
+                    <div class="card-year">2025 <span class="badge badge-yellow">Normalization</span></div>
+                    <div class="card-stats">
+                        <span>101</span> properties<br>
+                        <span>10.5%</span> avg vacancy<br>
+                        <span>19.8%</span> watchlist rate
+                    </div>
+                    <div class="cta-text">Supply shrinkage — 101 remain from 230+ peak →</div>
+                </div>
+            </a>
+        </div>
+
+        <!-- ── Property Profiles Section ──────────────── -->
+        <div class="section-title">📊 Property Profiles — 8 Vacancy Trajectories</div>
+        <p class="subtitle">
+            Deep-dive into individual CMBS-financed self-storage properties. Each profile shows
+            vacancy, NOI, OPEX, revenue, loan balance, and DSCR trends over the full data window.
+        </p>
+        <div class="profile-grid">
+            <a class="profile-card" href="profile_lockaway_ss___hollywood.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#e74c3c;">Low → High Vacancy</div>
+                    <div class="profile-name">📈 Lockaway SS - Hollywood</div>
+                    <div class="cta-text">6.8% → 20.2% vacancy — deterioration story →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_cypress_mini_storage.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#e74c3c;">Low → High Vacancy</div>
+                    <div class="profile-name">📈 Cypress Mini Storage</div>
+                    <div class="cta-text">8.0% → 25.3% vacancy — rapid weakening →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_storage_center_of_valencia.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#27ae60;">High → Low Vacancy</div>
+                    <div class="profile-name">📉 Storage Center of Valencia</div>
+                    <div class="cta-text">28.2% → 7.9% vacancy — recovery story →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_storage_express___palmdale_ca.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#27ae60;">High → Low Vacancy</div>
+                    <div class="profile-name">📉 Storage Express - Palmdale</div>
+                    <div class="cta-text">26.4% → 8.2% vacancy — turnaround →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_bv_hollywood_storage.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#2ecc71;">Always Low Vacancy</div>
+                    <div class="profile-name">🟢 BV Hollywood Storage</div>
+                    <div class="cta-text">Avg 0.5% vacancy — consistently full →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_storage_etc___torrance_ca.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#2ecc71;">Always Low Vacancy</div>
+                    <div class="profile-name">🟢 Storage Etc. - Torrance</div>
+                    <div class="cta-text">Avg 0.7% vacancy — tight submarket →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_socal_torrance.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#c0392b;">Always High Vacancy</div>
+                    <div class="profile-name">🔴 SoCal Torrance</div>
+                    <div class="cta-text">Avg 20.7% vacancy — persistent weakness →</div>
+                </div>
+            </a>
+            <a class="profile-card" href="profile_storbox_self_storage.html">
+                <div class="card-body">
+                    <div class="profile-badge" style="background:#c0392b;">Always High Vacancy</div>
+                    <div class="profile-name">🔴 Storbox Self Storage</div>
+                    <div class="cta-text">Avg 23.3% vacancy — structural challenge →</div>
+                </div>
+            </a>
+        </div>
+    </div>
+    <div class="footer">
+        <p>TerraCotta Group — CRE Research &amp; Analytics</p>
+        <p>Data: Trepp CMBS via Snowflake | Analysis: Python</p>
+    </div>
+</body>
+</html>
