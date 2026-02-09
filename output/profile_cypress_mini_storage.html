@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cypress Mini Storage — Property Profile (Monthly)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; color: #333; }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white; padding: 30px 20px; text-align: center;
+        }
+        .header h1 { font-size: 1.8em; margin-bottom: 4px; }
+        .header .address { color: #aaa; font-size: 0.95em; }
+        .header .category {
+            display: inline-block; margin-top: 10px; padding: 4px 14px;
+            border-radius: 20px; font-size: 0.85em; font-weight: 600;
+            background: #e74c3c; color: white;
+        }
+        .header .freq {
+            display: inline-block; margin-top: 6px; padding: 3px 12px;
+            border-radius: 16px; font-size: 0.78em; font-weight: 500;
+            background: rgba(255,255,255,0.15); color: #ddd;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        .kpi-row {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin-bottom: 24px;
+        }
+        .kpi {
+            background: white; border-radius: 10px; padding: 16px; text-align: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .kpi .label { font-size: 0.75em; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .kpi .value { font-size: 1.5em; font-weight: 700; margin-top: 4px; }
+        .kpi .sub { font-size: 0.75em; color: #999; margin-top: 2px; }
+        .chart-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 16px; margin-bottom: 20px;
+        }
+        .chart-card {
+            background: white; border-radius: 10px; padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .chart-card h3 {
+            font-size: 0.95em; color: #555; margin-bottom: 12px;
+            border-bottom: 2px solid #eee; padding-bottom: 6px;
+        }
+        .chart-card .note {
+            font-size: 0.72em; color: #aaa; margin-top: 4px; font-style: italic;
+        }
+        canvas { max-height: 300px; }
+        .data-table {
+            background: white; border-radius: 10px; padding: 20px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08); margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .data-table h3 { font-size: 0.95em; color: #555; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        th { background: #f1f3f5; padding: 8px 10px; text-align: right; font-weight: 600; color: #555; }
+        th:first-child { text-align: left; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; text-align: right; }
+        td:first-child { text-align: left; font-weight: 600; }
+        .footer {
+            text-align: center; padding: 20px; color: #aaa; font-size: 0.8em;
+            border-top: 1px solid #eee; margin-top: 20px;
+        }
+        .footer a { color: #888; text-decoration: none; }
+        .nav { text-align: center; margin-bottom: 16px; }
+        .nav a {
+            display: inline-block; padding: 6px 16px; margin: 4px;
+            border-radius: 20px; background: #e9ecef; color: #495057;
+            text-decoration: none; font-size: 0.85em;
+        }
+        .nav a:hover { background: #dee2e6; }
+        @media (max-width: 700px) {
+            .chart-grid { grid-template-columns: 1fr; }
+            .kpi-row { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📈 Cypress Mini Storage</h1>
+        <div class="address">8882 Watson Street, Cypress, CA 90630.0 &nbsp;|&nbsp; Built: 1988</div>
+        <div class="category">Low -> High Vacancy</div>
+        <div class="freq">Operating Statements Filed: Semi-Annual &nbsp;|&nbsp; Loan: Monthly</div>
+    </div>
+    <div class="container">
+        <div class="nav">
+            <a href="index.html">&larr; All Maps</a>
+            <a href="property_profiles.html">All 8 Profiles</a>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi">
+                <div class="label">Latest Vacancy</div>
+                <div class="value" style="color: #e74c3c;">25.0%</div>
+                <div class="sub">2011-04</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Latest NOI</div>
+                <div class="value">$182,514</div>
+                <div class="sub">2011-04</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Latest DSCR</div>
+                <div class="value" style="color: #27ae60;">1.33x</div>
+                <div class="sub">2011-04</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Loan Balance</div>
+                <div class="value">$0</div>
+                <div class="sub">2024-01</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Data Span</div>
+                <div class="value" style="font-size:1.1em;">2007&ndash;2024</div>
+                <div class="sub">205 monthly obs</div>
+            </div>
+            <div class="kpi">
+                <div class="label">Watchlist</div>
+                <div class="value" style="color: #27ae60;">No</div>
+                <div class="sub">&nbsp;</div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Vacancy Rate (%)</h3>
+                <canvas id="chartVacancy"></canvas>
+                <div class="note">Plotted at semi-annual filing dates only</div>
+            </div>
+            <div class="chart-card">
+                <h3>NOI &amp; Revenue ($)</h3>
+                <canvas id="chartNOI"></canvas>
+                <div class="note">Plotted at semi-annual filing dates only</div>
+            </div>
+            <div class="chart-card">
+                <h3>OPEX &amp; OPEX Ratio</h3>
+                <canvas id="chartOPEX"></canvas>
+                <div class="note">Plotted at semi-annual filing dates only</div>
+            </div>
+            <div class="chart-card">
+                <h3>Loan Balance — Monthly Amortisation ($)</h3>
+                <canvas id="chartLoan"></canvas>
+                <div class="note">Every monthly remittance tape observation</div>
+            </div>
+            <div class="chart-card">
+                <h3>DSCR (Debt Service Coverage)</h3>
+                <canvas id="chartDSCR"></canvas>
+                <div class="note">Plotted at semi-annual filing dates only</div>
+            </div>
+            <div class="chart-card">
+                <h3>NOI Margin (%)</h3>
+                <canvas id="chartMargin"></canvas>
+                <div class="note">Plotted at semi-annual filing dates only</div>
+            </div>
+        </div>
+
+        <div class="data-table">
+            <h3>Operating Statement Data (Filed Semi-Annual)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th><th>Vacancy</th><th>NOI</th><th>Revenue</th>
+                        <th>OPEX</th><th>OPEX Ratio</th><th>NOI Margin</th>
+                        <th>DSCR</th><th>Loan Bal.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>2007-09</td><td>0.0%</td><td>$129,711</td><td>$146,088</td><td>$16,377</td><td>11.2%</td><td>88.8%</td><td>1.89x</td><td>$2,300,000</td></tr>
+                    <tr><td>2007-11</td><td>—</td><td>$112,573</td><td>$146,088</td><td>$33,515</td><td>22.9%</td><td>77.1%</td><td>1.64x</td><td>$2,300,000</td></tr>
+                    <tr><td>2008-04</td><td>—</td><td>$199,864</td><td>$291,749</td><td>$91,885</td><td>31.5%</td><td>68.5%</td><td>1.22x</td><td>$2,291,339</td></tr>
+                    <tr><td>2009-02</td><td>24.0%</td><td>$120,423</td><td>$205,622</td><td>$85,199</td><td>41.4%</td><td>58.6%</td><td>1.76x</td><td>$2,300,000</td></tr>
+                    <tr><td>2009-11</td><td>28.0%</td><td>$82,250</td><td>$170,288</td><td>$88,038</td><td>51.7%</td><td>48.3%</td><td>1.20x</td><td>$2,300,000</td></tr>
+                    <tr><td>2010-04</td><td>26.0%</td><td>$121,994</td><td>$252,490</td><td>$130,496</td><td>51.7%</td><td>48.3%</td><td>1.19x</td><td>$2,300,000</td></tr>
+                    <tr><td>2011-04</td><td>25.0%</td><td>$182,514</td><td>$350,226</td><td>$167,712</td><td>47.9%</td><td>52.1%</td><td>1.33x</td><td>$2,300,000</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>TerraCotta Group — CRE Research | Data: Trepp CMBS via Snowflake (monthly resolution)</p>
+        <p><a href="index.html">&larr; Back to Maps</a> &nbsp;|&nbsp; <a href="property_profiles.html">All Profiles</a></p>
+    </div>
+
+    <script>
+    const loanLabels = ["2007-02", "2007-03", "2007-04", "2007-05", "2007-06", "2007-07", "2007-08", "2007-09", "2007-10", "2007-11", "2007-12", "2008-01", "2008-02", "2008-03", "2008-04", "2008-05", "2008-06", "2008-07", "2008-08", "2008-09", "2008-10", "2008-11", "2008-12", "2009-01", "2009-02", "2009-03", "2009-04", "2009-05", "2009-06", "2009-07", "2009-08", "2009-09", "2009-10", "2009-11", "2009-12", "2010-01", "2010-02", "2010-03", "2010-04", "2010-05", "2010-06", "2010-07", "2010-08", "2010-09", "2010-10", "2010-11", "2010-12", "2011-01", "2011-02", "2011-03", "2011-04", "2011-05", "2011-06", "2011-07", "2011-08", "2011-09", "2011-10", "2011-11", "2011-12", "2012-01", "2012-02", "2012-03", "2012-04", "2012-05", "2012-06", "2012-07", "2012-08", "2012-09", "2012-10", "2012-11", "2012-12", "2013-01", "2013-02", "2013-03", "2013-04", "2013-05", "2013-06", "2013-07", "2013-08", "2013-09", "2013-10", "2013-11", "2013-12", "2014-01", "2014-02", "2014-03", "2014-04", "2014-05", "2014-06", "2014-07", "2014-08", "2014-09", "2014-10", "2014-11", "2014-12", "2015-01", "2015-02", "2015-03", "2015-04", "2015-05", "2015-06", "2015-07", "2015-08", "2015-09", "2015-10", "2015-11", "2015-12", "2016-01", "2016-02", "2016-03", "2016-04", "2016-05", "2016-06", "2016-07", "2016-08", "2016-09", "2016-10", "2016-11", "2016-12", "2017-01", "2017-02", "2017-03", "2017-04", "2017-05", "2017-06", "2017-07", "2017-08", "2017-09", "2017-10", "2017-11", "2017-12", "2018-01", "2018-02", "2018-03", "2018-04", "2018-05", "2018-06", "2018-07", "2018-08", "2018-09", "2018-10", "2018-11", "2018-12", "2019-01", "2019-02", "2019-03", "2019-04", "2019-05", "2019-06", "2019-07", "2019-08", "2019-09", "2019-10", "2019-11", "2019-12", "2020-01", "2020-02", "2020-03", "2020-04", "2020-05", "2020-06", "2020-07", "2020-08", "2020-09", "2020-10", "2020-11", "2020-12", "2021-01", "2021-02", "2021-03", "2021-04", "2021-05", "2021-06", "2021-07", "2021-08", "2021-09", "2021-10", "2021-11", "2021-12", "2022-01", "2022-02", "2022-03", "2022-04", "2022-05", "2022-06", "2022-07", "2022-08", "2022-09", "2022-10", "2022-11", "2022-12", "2023-01", "2023-02", "2023-03", "2023-04", "2023-05", "2023-06", "2023-07", "2023-08", "2023-09", "2023-10", "2023-11", "2023-12", "2024-01", "2024-01"];
+    const loanData   = [0.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2298038.55, 2296067.15, 2293334.3, 2291339.04, 2288958.71, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2300000.0, 2297277.02, 2295290.08, 2292918.97, 2292918.97, 2288517.48, 2286486.28, 2284444.82, 2282020.68, 2282020.68, 2277510.56, 2275423.74, 2273326.38, 2270106.76, 2267982.53, 2265477.88, 2263330.26, 2260802.86, 2260802.86, 2258631.62, 2256449.41, 2253888.37, 2251682.19, 2249097.84, 2246867.45, 2244625.79, 2241275.18, 2239005.26, 2236358.92, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    const vacLabels  = ["2007-09", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const vacData    = [0.0, 24.0, 28.0, 26.0, 25.0];
+    const noiLabels  = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const noiData    = [129711.33, 112573.0, 199864.0, 120423.0, 82250.0, 121994.0, 182513.56];
+    const revLabels  = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const revData    = [146088.08, 146088.0, 291749.0, 205622.0, 170288.0, 252490.0, 350225.77];
+    const opexLabels = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const opexData   = [16376.75, 33515.0, 91885.0, 85199.0, 88038.0, 130496.0, 167712.21];
+    const dscrLabels = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const dscrData   = [1.89, 1.64, 1.22, 1.76, 1.2, 1.19, 1.33];
+    const opexRatioLabels = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const opexRatioData   = [11.2, 22.9, 31.5, 41.4, 51.7, 51.7, 47.9];
+    const noiMarginLabels = ["2007-09", "2007-11", "2008-04", "2009-02", "2009-11", "2010-04", "2011-04"];
+    const noiMarginData   = [88.8, 77.1, 68.5, 58.6, 48.3, 48.3, 52.1];
+
+    const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: true, position: 'top', labels: { font: { size: 11 } } },
+            tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+            x: { ticks: { font: { size: 10 }, maxRotation: 45, autoSkip: true, maxTicksLimit: 18 } },
+            y: { ticks: { font: { size: 11 } } }
+        },
+        spanGaps: true,
+    };
+
+    new Chart(document.getElementById('chartVacancy'), {
+        type: 'line',
+        data: {
+            labels: vacLabels,
+            datasets: [{
+                label: 'Vacancy %',
+                data: vacData,
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231,76,60,0.1)',
+                fill: true, tension: 0.3, pointRadius: 5, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, ticks: { callback: v => v+'%' } } } }
+    });
+
+    new Chart(document.getElementById('chartNOI'), {
+        type: 'bar',
+        data: {
+            labels: noiLabels,
+            datasets: [
+                { label: 'Revenue', data: revData, backgroundColor: 'rgba(52,152,219,0.6)', borderRadius: 3 },
+                { label: 'NOI', data: noiData, backgroundColor: 'rgba(46,204,113,0.7)', borderRadius: 3 },
+            ]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ticks: { callback: v => '$'+Math.round(v/1000)+'K' } } } }
+    });
+
+    new Chart(document.getElementById('chartOPEX'), {
+        type: 'bar',
+        data: {
+            labels: opexLabels,
+            datasets: [
+                { label: 'OPEX ($)', data: opexData, backgroundColor: 'rgba(230,126,34,0.6)', borderRadius: 3, yAxisID: 'y' },
+                { label: 'OPEX Ratio (%)', data: opexRatioData, type: 'line', borderColor: '#8e44ad',
+                   pointRadius: 4, borderWidth: 2, yAxisID: 'y1' },
+            ]
+        },
+        options: {
+            ...commonOpts,
+            scales: {
+                x: commonOpts.scales.x,
+                y: { position: 'left', ticks: { callback: v => '$'+Math.round(v/1000)+'K' } },
+                y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: v => v+'%' }, min: 0, max: 100 },
+            }
+        }
+    });
+
+    new Chart(document.getElementById('chartLoan'), {
+        type: 'line',
+        data: {
+            labels: loanLabels,
+            datasets: [{
+                label: 'Loan Balance',
+                data: loanData,
+                borderColor: '#2c3e50',
+                backgroundColor: 'rgba(44,62,80,0.08)',
+                fill: true, tension: 0.1, pointRadius: 0, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { ticks: { callback: v => '$'+(v/1e6).toFixed(1)+'M' } } } }
+    });
+
+    new Chart(document.getElementById('chartDSCR'), {
+        type: 'line',
+        data: {
+            labels: dscrLabels,
+            datasets: [
+                { label: 'DSCR', data: dscrData, borderColor: '#2980b9', pointRadius: 5, borderWidth: 2, tension: 0.3 },
+                { label: '1.0x', data: dscrLabels.map(() => 1.0), borderColor: '#e74c3c', borderDash: [6,4], borderWidth: 1.5, pointRadius: 0 },
+                { label: '1.25x', data: dscrLabels.map(() => 1.25), borderColor: '#f39c12', borderDash: [6,4], borderWidth: 1.5, pointRadius: 0 },
+            ]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, ticks: { callback: v => v.toFixed(1)+'x' } } } }
+    });
+
+    new Chart(document.getElementById('chartMargin'), {
+        type: 'line',
+        data: {
+            labels: noiMarginLabels,
+            datasets: [{
+                label: 'NOI Margin %',
+                data: noiMarginData,
+                borderColor: '#27ae60',
+                backgroundColor: 'rgba(39,174,96,0.1)',
+                fill: true, tension: 0.3, pointRadius: 5, borderWidth: 2,
+            }]
+        },
+        options: { ...commonOpts, scales: { ...commonOpts.scales, y: { min: 0, max: 100, ticks: { callback: v => v+'%' } } } }
+    });
+    </script>
+</body>
+</html>
