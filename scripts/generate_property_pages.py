@@ -81,7 +81,33 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
 
     # -- Monthly loan balance (continuous) --
     all_labels = sub['date_label'].tolist()
-    loan_vals = [round(float(v), 2) if pd.notna(v) else None for v in sub['LOAN_CURRENT_BALANCE']]
+    loan_vals_raw = [round(float(v), 2) if pd.notna(v) else None for v in sub['LOAN_CURRENT_BALANCE']]
+
+    # Trim trailing $0 months (loan paid off / defeased)
+    # Find the last month with a non-zero balance
+    last_nonzero_idx = None
+    for i in range(len(loan_vals_raw) - 1, -1, -1):
+        if loan_vals_raw[i] is not None and loan_vals_raw[i] > 0:
+            last_nonzero_idx = i
+            break
+
+    loan_paid_off = False
+    loan_payoff_date = None
+    if last_nonzero_idx is not None and last_nonzero_idx < len(loan_vals_raw) - 1:
+        # There are $0 months after the last non-zero → loan paid off
+        loan_paid_off = True
+        payoff_idx = last_nonzero_idx + 1
+        loan_payoff_date = all_labels[payoff_idx]
+        # Keep up to and including the first $0 month to show the payoff
+        loan_labels = all_labels[:payoff_idx + 1]
+        loan_vals = loan_vals_raw[:payoff_idx + 1]
+    elif last_nonzero_idx is None:
+        # All zeros or null — could be IO or never funded; show all
+        loan_labels = all_labels
+        loan_vals = loan_vals_raw
+    else:
+        loan_labels = all_labels
+        loan_vals = loan_vals_raw
 
     # -- Operating statement metrics: keep only change-points --
     noi_labels,  noi_vals  = _dedupe_opst(sub, 'NOI_CURRENT')
@@ -115,11 +141,16 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
     latest_vac_date = vac_labels[-1] if vac_labels else None
     latest_dscr = dscr_vals[-1] if dscr_vals else None
     latest_dscr_date = dscr_labels[-1] if dscr_labels else None
+    # For loan KPI, show last non-zero balance (not the $0 payoff)
     latest_loan, latest_loan_date = None, None
-    for v, lbl in zip(reversed(loan_vals), reversed(all_labels)):
-        if v is not None:
+    for v, lbl in zip(reversed(loan_vals_raw), reversed(all_labels)):
+        if v is not None and v > 0:
             latest_loan, latest_loan_date = v, lbl
             break
+    # If loan fully paid off, override
+    if loan_paid_off:
+        latest_loan = 0
+        latest_loan_date = loan_payoff_date
 
     yr_min = int(sub['REPORT_YEAR'].min())
     yr_max = int(sub['REPORT_YEAR'].max())
@@ -273,8 +304,8 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
             </div>
             <div class="kpi">
                 <div class="label">Loan Balance</div>
-                <div class="value">{fmt_money(latest_loan)}</div>
-                <div class="sub">{latest_loan_date or '—'}</div>
+                <div class="value">{'Paid Off' if loan_paid_off else fmt_money(latest_loan)}</div>
+                <div class="sub">{('Defeased ' + loan_payoff_date) if loan_paid_off else (latest_loan_date or '—')}</div>
             </div>
             <div class="kpi">
                 <div class="label">Data Span</div>
@@ -290,34 +321,34 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
 
         <div class="chart-grid">
             <div class="chart-card">
-                <h3>Vacancy Rate (%)</h3>
+                <h3>Vacancy Rate (%) — from Loan Table</h3>
                 <canvas id="chartVacancy"></canvas>
-                <div class="note">Plotted at {filing_freq.lower()} filing dates only</div>
+                <div class="note">Source: MOSTRECENTPHYSICALOCCUPANCY (loan remittance tape, updated with each operating statement)</div>
             </div>
             <div class="chart-card">
-                <h3>NOI &amp; Revenue ($)</h3>
+                <h3>NOI &amp; Revenue ($) — from Operating Statement</h3>
                 <canvas id="chartNOI"></canvas>
-                <div class="note">Plotted at {filing_freq.lower()} filing dates only</div>
+                <div class="note">{filing_freq} operating statements ({len(noi_vals)} filings)</div>
             </div>
             <div class="chart-card">
-                <h3>OPEX &amp; OPEX Ratio</h3>
+                <h3>OPEX &amp; OPEX Ratio — from Operating Statement</h3>
                 <canvas id="chartOPEX"></canvas>
-                <div class="note">Plotted at {filing_freq.lower()} filing dates only</div>
+                <div class="note">{filing_freq} operating statements ({len(opex_vals)} filings)</div>
             </div>
             <div class="chart-card">
                 <h3>Loan Balance — Monthly Amortisation ($)</h3>
                 <canvas id="chartLoan"></canvas>
-                <div class="note">Every monthly remittance tape observation</div>
+                <div class="note">{'Loan paid off / defeased ' + loan_payoff_date + '. Post-payoff $0 months trimmed.' if loan_paid_off else 'Every monthly remittance tape observation'}</div>
             </div>
             <div class="chart-card">
-                <h3>DSCR (Debt Service Coverage)</h3>
+                <h3>DSCR (Debt Service Coverage) \u2014 from Loan Table</h3>
                 <canvas id="chartDSCR"></canvas>
-                <div class="note">Plotted at {filing_freq.lower()} filing dates only</div>
+                <div class="note">Source: MOSTRECENTDSCR_NOI ({len(dscr_vals)} filings)</div>
             </div>
             <div class="chart-card">
-                <h3>NOI Margin (%)</h3>
+                <h3>NOI Margin (%) \u2014 from Operating Statement</h3>
                 <canvas id="chartMargin"></canvas>
-                <div class="note">Plotted at {filing_freq.lower()} filing dates only</div>
+                <div class="note">{filing_freq} operating statements ({len(noi_vals)} filings)</div>
             </div>
         </div>
 
@@ -356,7 +387,7 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
     </div>
 
     <script>
-    const loanLabels = {js(all_labels)};
+    const loanLabels = {js(loan_labels)};
     const loanData   = {js(loan_vals)};
     const vacLabels  = {js(vac_labels)};
     const vacData    = {js(vac_vals)};
