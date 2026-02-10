@@ -254,6 +254,46 @@
         </div>
     </div>
 
+    
+        <div class="data-table" style="margin-top: 20px; background: linear-gradient(to right, #f8f9fa, #fff8e7);">
+            <h3 style="color: #8b4513;">📊 Vacancy Collection Loss Comparison (Storbox Only)</h3>
+            <p style="font-size: 0.85em; color: #666; margin-bottom: 15px;">
+                Storbox is the <b>only property</b> in our 8 with VACANCYCOLLECTIONLOSS data in TREPP_CMBS_ORIG_OPEX.
+                This allows comparing physical vacancy % vs. economic vacancy $.
+            </p>
+            <table style="font-size: 0.9em;">
+                <tr>
+                    <th style="text-align:left;">Metric</th>
+                    <th style="text-align:left;">Source</th>
+                    <th style="text-align:left;">2017 Value</th>
+                    <th style="text-align:left;">Interpretation</th>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Physical Vacancy</td>
+                    <td>MOSTRECENTPHYSICALOCCUPANCY (Loan Table)</td>
+                    <td style="color: #c0392b;"><b>15.8%</b> avg</td>
+                    <td>Actual vacant units / total units</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Implied Economic Vacancy</td>
+                    <td>VACANCYCOLLECTIONLOSS / GROSSPOTENTIALRENT (OPEX)</td>
+                    <td style="color: #27ae60;"><b>11.4%</b></td>
+                    <td>Lost rent / potential rent</td>
+                </tr>
+                <tr>
+                    <td style="font-weight:600;">Gap</td>
+                    <td>—</td>
+                    <td><b>4.4pp</b></td>
+                    <td>Physical > Economic</td>
+                </tr>
+            </table>
+            <p style="font-size: 0.8em; color: #888; margin-top: 12px;">
+                <b>Why the gap?</b> Physical vacancy counts empty units, but economic vacancy only counts 
+                lost revenue. Concessions, move-in specials, and timing differences cause the physical rate 
+                to exceed the economic rate. The 2017-02-16 OPEX statement shows: GPR $5,026,880 | VCL -$572,857.
+            </p>
+        </div>
+
     <div class="footer">
         <p>TerraCotta Group — CRE Research | Data: Trepp CMBS via Snowflake (monthly resolution)</p>
         <p><a href="index.html">&larr; Back to Maps</a> &nbsp;|&nbsp; <a href="property_profiles.html">All Profiles</a></p>
