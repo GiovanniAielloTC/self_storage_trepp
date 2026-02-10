@@ -405,9 +405,9 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
 
         <div class="chart-grid">
             <div class="chart-card">
-                <h3>Vacancy Rate (%) — from Loan Table</h3>
+                <h3>Vacancy Rate (%) — from Operating Statement</h3>
                 <canvas id="chartVacancy"></canvas>
-                <div class="note">Source: MOSTRECENTPHYSICALOCCUPANCY (loan remittance tape, updated with each operating statement)</div>
+                <div class="note">Source: MOSTRECENTPHYSICALOCCUPANCY (updates with each operating statement filing, same cadence as NOI/OPEX)</div>
             </div>
             <div class="chart-card">
                 <h3>NOI &amp; Revenue ($) — from Operating Statement</h3>
@@ -420,14 +420,14 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
                 <div class="note">{filing_freq} operating statements ({len(opex_vals)} filings)</div>
             </div>
             <div class="chart-card">
-                <h3>Loan Balance — Monthly Amortisation ($)</h3>
+                <h3>Loan Balance — Monthly from Servicer</h3>
                 <canvas id="chartLoan"></canvas>
-                <div class="note">{'Loan paid off / defeased ' + loan_payoff_date + '. Post-payoff $0 months trimmed.' if loan_paid_off else 'Every monthly remittance tape observation'}</div>
+                <div class="note">{'Loan paid off / defeased ' + loan_payoff_date + '. Post-payoff $0 months trimmed.' if loan_paid_off else 'Monthly remittance tape (ONLY truly monthly data)'}</div>
             </div>
             <div class="chart-card">
-                <h3>DSCR (Debt Service Coverage) \u2014 from Loan Table</h3>
+                <h3>DSCR (Debt Service Coverage) \u2014 from Operating Statement</h3>
                 <canvas id="chartDSCR"></canvas>
-                <div class="note">Source: MOSTRECENTDSCR_NOI ({len(dscr_vals)} filings)</div>
+                <div class="note">Source: MOSTRECENTDSCR_NOI ({len(dscr_vals)} filings, same cadence as NOI)</div>
             </div>
             <div class="chart-card">
                 <h3>NOI Margin (%) \u2014 from Operating Statement</h3>
