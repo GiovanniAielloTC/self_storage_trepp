@@ -158,9 +158,9 @@
 
         <div class="chart-grid">
             <div class="chart-card">
-                <h3>Vacancy Rate (%) — from Loan Table</h3>
+                <h3>Vacancy Rate (%) — from Operating Statement</h3>
                 <canvas id="chartVacancy"></canvas>
-                <div class="note">Source: MOSTRECENTPHYSICALOCCUPANCY (loan remittance tape, updated with each operating statement)</div>
+                <div class="note">Source: MOSTRECENTPHYSICALOCCUPANCY (updates with each operating statement filing, same cadence as NOI/OPEX)</div>
             </div>
             <div class="chart-card">
                 <h3>NOI &amp; Revenue ($) — from Operating Statement</h3>
@@ -173,14 +173,14 @@
                 <div class="note">Quarterly operating statements (49 filings)</div>
             </div>
             <div class="chart-card">
-                <h3>Loan Balance — Monthly Amortisation ($)</h3>
+                <h3>Loan Balance — Monthly from Servicer</h3>
                 <canvas id="chartLoan"></canvas>
-                <div class="note">Every monthly remittance tape observation</div>
+                <div class="note">Monthly remittance tape (ONLY truly monthly data)</div>
             </div>
             <div class="chart-card">
-                <h3>DSCR (Debt Service Coverage) — from Loan Table</h3>
+                <h3>DSCR (Debt Service Coverage) — from Operating Statement</h3>
                 <canvas id="chartDSCR"></canvas>
-                <div class="note">Source: MOSTRECENTDSCR_NOI (47 filings)</div>
+                <div class="note">Source: MOSTRECENTDSCR_NOI (47 filings, same cadence as NOI)</div>
             </div>
             <div class="chart-card">
                 <h3>NOI Margin (%) — from Operating Statement</h3>
