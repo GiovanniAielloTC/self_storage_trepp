@@ -65,6 +65,58 @@ def _dedupe_opst(sub, col):
     return s['date_label'].tolist(), [round(float(v), 2) for v in s[col]]
 
 
+def _compute_vacancy_stats(vac_series):
+    """Compute volatility, persistence, and pattern classification for vacancy."""
+    vac = vac_series.dropna()
+    if len(vac) < 3:
+        return {
+            'mean': None, 'std': None, 'min': None, 'max': None, 'range': None,
+            'cv': None, 'persistence': None, 'avg_change': None, 'big_moves': None, 'pattern': 'Insufficient Data'
+        }
+    
+    mean_vac = vac.mean()
+    std_vac = vac.std()
+    min_vac = vac.min()
+    max_vac = vac.max()
+    range_vac = max_vac - min_vac
+    
+    # Coefficient of Variation (volatility measure)
+    cv = std_vac / mean_vac if mean_vac > 0 else 0
+    
+    # Month-over-month changes
+    vac_changes = vac.diff().dropna()
+    avg_change = vac_changes.abs().mean() if len(vac_changes) > 0 else 0
+    
+    # Persistence (autocorrelation lag-1)
+    persistence = vac.autocorr(lag=1) if len(vac) > 2 else np.nan
+    
+    # Count big moves (>3pp change)
+    big_moves = int((vac_changes.abs() > 3).sum()) if len(vac_changes) > 0 else 0
+    
+    # Pattern classification
+    if range_vac < 5:
+        pattern = "Stable"
+    elif big_moves >= 5:
+        pattern = "Volatile"
+    elif range_vac > 15 and big_moves < 5:
+        pattern = "Spike & Return"
+    else:
+        pattern = "Moderate"
+    
+    return {
+        'mean': round(mean_vac, 1),
+        'std': round(std_vac, 1),
+        'min': round(min_vac, 1),
+        'max': round(max_vac, 1),
+        'range': round(range_vac, 1),
+        'cv': round(cv, 2),
+        'persistence': round(persistence, 2) if not np.isnan(persistence) else None,
+        'avg_change': round(avg_change, 2),
+        'big_moves': big_moves,
+        'pattern': pattern
+    }
+
+
 def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color, filing_freq):
     """Build a single-page interactive HTML dashboard for one property."""
 
@@ -115,6 +167,9 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
     opex_labels, opex_vals = _dedupe_opst(sub, 'OPEX_CURRENT')
     dscr_labels, dscr_vals = _dedupe_opst(sub, 'DSCR_CURRENT')
     vac_labels,  vac_vals  = _dedupe_opst(sub, 'VACANCY_RATE')
+
+    # -- Vacancy summary statistics --
+    vac_stats = _compute_vacancy_stats(sub['VACANCY_RATE'])
 
     # -- OPEX ratio & NOI margin at change-points --
     opex_ratio_labels, opex_ratio_vals = [], []
@@ -316,6 +371,35 @@ def build_property_page(monthly_df, meta, prop_name, category, emoji, cat_color,
                 <div class="label">Watchlist</div>
                 <div class="value" style="color: {wl_color};">{wl_txt}</div>
                 <div class="sub">&nbsp;</div>
+            </div>
+        </div>
+
+        <!-- Vacancy Statistics Row -->
+        <div class="kpi-row" style="margin-bottom: 28px;">
+            <div class="kpi" style="border-left: 3px solid #3498db;">
+                <div class="label">Vacancy Pattern</div>
+                <div class="value" style="font-size: 1.1em; color: {'#e74c3c' if vac_stats['pattern'] == 'Volatile' else '#27ae60' if vac_stats['pattern'] == 'Stable' else '#f39c12'};">{vac_stats['pattern']}</div>
+                <div class="sub">Range: {vac_stats['range'] or 'N/A'}pp</div>
+            </div>
+            <div class="kpi" style="border-left: 3px solid #3498db;">
+                <div class="label">Volatility (CV)</div>
+                <div class="value" style="font-size: 1.1em;">{vac_stats['cv'] if vac_stats['cv'] is not None else 'N/A'}</div>
+                <div class="sub">Std Dev: {vac_stats['std'] or 'N/A'}pp</div>
+            </div>
+            <div class="kpi" style="border-left: 3px solid #3498db;">
+                <div class="label">Persistence</div>
+                <div class="value" style="font-size: 1.1em;">{vac_stats['persistence'] if vac_stats['persistence'] is not None else 'N/A'}</div>
+                <div class="sub">Autocorrelation (lag-1)</div>
+            </div>
+            <div class="kpi" style="border-left: 3px solid #3498db;">
+                <div class="label">Avg MoM Change</div>
+                <div class="value" style="font-size: 1.1em;">{vac_stats['avg_change'] if vac_stats['avg_change'] is not None else 'N/A'}pp</div>
+                <div class="sub">Big moves (&gt;3pp): {vac_stats['big_moves'] or 0}</div>
+            </div>
+            <div class="kpi" style="border-left: 3px solid #3498db;">
+                <div class="label">Vacancy Range</div>
+                <div class="value" style="font-size: 1.0em;">{vac_stats['min'] or 'N/A'}% — {vac_stats['max'] or 'N/A'}%</div>
+                <div class="sub">Mean: {vac_stats['mean'] or 'N/A'}%</div>
             </div>
         </div>
 
